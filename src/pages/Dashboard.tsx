@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import AppLayout from '../layouts/AppLayout';
-import GlassCard from '../components/ui/GlassCard';
-import NeoButton from '../components/ui/NeoButton';
+import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { Modal } from '../components/ui/Modal';
 import UploadZone from '../components/features/UploadZone';
 import FilePreview from '../components/features/FilePreview';
 import {
@@ -9,8 +11,9 @@ import {
   DocumentIcon,
   PhotoIcon,
   CloudArrowUpIcon,
-  XMarkIcon
+  VideoCameraIcon
 } from '@heroicons/react/24/outline';
+import { cn } from '../lib/utils';
 
 interface DocumentItem {
   id: string;
@@ -71,7 +74,8 @@ const Dashboard: React.FC = () => {
   const getFileIcon = (mimeType: string) => {
     if (mimeType.includes('image')) return <PhotoIcon className="w-8 h-8 text-pink-400" />;
     if (mimeType.includes('pdf')) return <DocumentIcon className="w-8 h-8 text-red-400" />;
-    return <DocumentIcon className="w-8 h-8 text-blue-400" />;
+    if (mimeType.includes('video')) return <VideoCameraIcon className="w-8 h-8 text-blue-400" />;
+    return <DocumentIcon className="w-8 h-8 text-indigo-400" />;
   };
 
   return (
@@ -79,23 +83,23 @@ const Dashboard: React.FC = () => {
       <div className="flex flex-col h-full relative">
         {/* Header / Search Area */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-          <h1 className="text-3xl font-bold text-white">My Vault</h1>
+          <h1 className="text-3xl font-bold gradient-text">My Vault</h1>
 
-          <div className="flex items-center gap-3">
-            <div className="relative w-full md:w-80 group">
-              <input
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="relative w-full md:w-96 group">
+              <Input
                 type="text"
                 placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all custom-input"
+                className="pl-10 h-10 border-white/10 bg-white/5 focus:bg-white/10"
               />
-              <MagnifyingGlassIcon className="w-5 h-5 text-gray-400 absolute left-3 top-3.5" />
+              <MagnifyingGlassIcon className="w-5 h-5 text-muted-foreground absolute left-3 top-2.5" />
             </div>
-            <NeoButton onClick={() => setShowUpload(true)} variant="primary" className="hidden md:flex">
-              <CloudArrowUpIcon className="w-5 h-5" />
+            <Button onClick={() => setShowUpload(true)} variant="premium" className="hidden md:flex">
+              <CloudArrowUpIcon className="w-5 h-5 mr-2" />
               Upload
-            </NeoButton>
+            </Button>
           </div>
         </div>
 
@@ -105,13 +109,12 @@ const Dashboard: React.FC = () => {
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`
-                        px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all
-                        ${selectedCategory === cat
-                  ? 'bg-primary text-white shadow-neon'
-                  : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
-                }
-                    `}
+              className={cn(
+                "px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all",
+                selectedCategory === cat
+                  ? "bg-primary text-white shadow-neon"
+                  : "bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-white"
+              )}
             >
               {cat}
             </button>
@@ -127,20 +130,20 @@ const Dashboard: React.FC = () => {
           ) : filteredItems.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20">
               {filteredItems.map((item) => (
-                <GlassCard key={item.id} className="group relative overflow-hidden p-0 flex flex-col h-[280px]">
+                <Card key={item.id} variant="glass" className="group relative overflow-hidden p-0 flex flex-col h-[280px] hover:scale-[1.02] transition-transform duration-300">
                   {/* Thumbnail Preview */}
                   <div
-                    className="h-40 bg-gray-900/50 relative overflow-hidden group-hover:opacity-80 transition-opacity cursor-pointer"
+                    className="h-40 bg-gray-900/50 relative overflow-hidden cursor-pointer"
                     onClick={() => setPreviewFile(item)}
                   >
                     {item.thumbnailLink ? (
-                      <img src={item.thumbnailLink} alt={item.name} className="w-full h-full object-cover" />
+                      <img src={item.thumbnailLink} alt={item.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center">
+                      <div className="w-full h-full flex items-center justify-center bg-secondary/50">
                         {getFileIcon(item.mimeType)}
                       </div>
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
                       <span className="px-4 py-2 bg-white/10 backdrop-blur-md rounded-full text-white text-sm font-medium border border-white/20">
                         Preview
                       </span>
@@ -156,14 +159,14 @@ const Dashboard: React.FC = () => {
                           {getFileIcon(item.mimeType)}
                         </div>
                       </div>
-                      <span className="text-xs text-gray-500 uppercase tracking-wider">{item.category}</span>
+                      <span className="text-xs text-muted-foreground uppercase tracking-wider bg-white/5 px-2 py-0.5 rounded-full">{item.category}</span>
                     </div>
                   </div>
-                </GlassCard>
+                </Card>
               ))}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+            <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
               <DocumentIcon className="w-16 h-16 mb-4 opacity-20" />
               <p>No documents found.</p>
             </div>
@@ -171,24 +174,14 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Upload Modal */}
-        {showUpload && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="w-full max-w-3xl relative">
-              <button
-                onClick={() => setShowUpload(false)}
-                className="absolute -top-10 right-0 text-white/50 hover:text-white"
-              >
-                <XMarkIcon className="w-8 h-8" />
-              </button>
-              <UploadZone onUploadComplete={() => {
-                // Optional: Refresh list or show success message
-                // We rely on GitHub Sync for the public list, but client-side we can maybe mock it?
-                // For now, just close modal
-                setShowUpload(false);
-              }} />
-            </div>
-          </div>
-        )}
+        <Modal
+          isOpen={showUpload}
+          onClose={() => setShowUpload(false)}
+          title="Upload Documents"
+          className="max-w-2xl"
+        >
+          <UploadZone onUploadComplete={() => setShowUpload(false)} />
+        </Modal>
 
         {/* Preview Modal */}
         {previewFile && (
@@ -196,12 +189,13 @@ const Dashboard: React.FC = () => {
         )}
 
         {/* Mobile FAB for Upload */}
-        <button
+        <Button
           onClick={() => setShowUpload(true)}
-          className="md:hidden fixed bottom-20 right-6 w-14 h-14 bg-primary rounded-full flex items-center justify-center shadow-neon z-40 active:scale-90 transition-transform"
+          variant="premium"
+          className="md:hidden fixed bottom-20 right-6 w-14 h-14 rounded-full p-0 shadow-neon z-40"
         >
           <CloudArrowUpIcon className="w-7 h-7 text-white" />
-        </button>
+        </Button>
       </div>
     </AppLayout>
   );

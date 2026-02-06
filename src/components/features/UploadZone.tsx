@@ -1,8 +1,8 @@
 import React, { useCallback, useState } from 'react';
-import GlassCard from '../ui/GlassCard';
-import NeoButton from '../ui/NeoButton';
+import { Card } from '../ui/Card';
+import { Button } from '../ui/Button';
 import { CloudArrowUpIcon, DocumentIcon, XMarkIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
-import { useAuthStore } from '../../store/authStore';
+import { cn } from '../../lib/utils';
 
 interface UploadZoneProps {
     onUploadComplete: () => void;
@@ -67,7 +67,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
             const metadata = {
                 name: file.name,
                 mimeType: file.type,
-                parents: [import.meta.env.VITE_GDRIVE_FOLDER_ID] // Need to ensure this env var is accessible
+                parents: [import.meta.env.VITE_GDRIVE_FOLDER_ID]
             };
 
             const initRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable', {
@@ -75,7 +75,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
                     'Content-Type': 'application/json',
-                    'X-Upload-Content-Type': file.type,
+                    'X-Upload-Content-Type': file.type || 'application/octet-stream',
                     'X-Upload-Content-Length': file.size.toString()
                 },
                 body: JSON.stringify(metadata)
@@ -89,7 +89,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
             // 2. Upload Content
             const xhr = new XMLHttpRequest();
             xhr.open('PUT', uploadUrl, true);
-            xhr.setRequestHeader('Content-Type', file.type);
+            xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
 
             xhr.upload.onprogress = (e) => {
                 if (e.lengthComputable) {
@@ -125,7 +125,6 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
     };
 
     const startUploads = () => {
-        // Request Access Token
         const client = window.google.accounts.oauth2.initTokenClient({
             client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
             scope: 'https://www.googleapis.com/auth/drive.file',
@@ -143,15 +142,14 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
     };
 
     return (
-        <div className="w-full max-w-2xl mx-auto">
+        <div className="w-full mx-auto">
             <div
-                className={`
-            relative border-2 border-dashed rounded-3xl p-10 text-center transition-all duration-300
-            ${isDragging
+                className={cn(
+                    "relative border-2 border-dashed rounded-3xl p-10 text-center transition-all duration-300",
+                    isDragging
                         ? 'border-primary bg-primary/10 scale-[1.02]'
                         : 'border-white/20 hover:border-white/40 bg-white/5'
-                    }
-        `}
+                )}
                 onDragEnter={handleDrag}
                 onDragOver={handleDrag}
                 onDragLeave={handleDrag}
@@ -163,7 +161,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
                     </div>
                     <div>
                         <h3 className="text-xl font-semibold text-white mb-2">Drag documents here</h3>
-                        <p className="text-gray-400">or click to browse files from your device</p>
+                        <p className="text-muted-foreground">or click to browse files from your device</p>
                     </div>
                     <input
                         type="file"
@@ -175,45 +173,53 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
             </div>
 
             {files.length > 0 && (
-                <GlassCard className="mt-8 space-y-4">
-                    {files.map((file) => (
-                        <div key={file.name} className="flex items-center gap-4 bg-white/5 p-3 rounded-xl border border-white/5">
-                            <DocumentIcon className="w-8 h-8 text-indigo-400" />
-                            <div className="flex-1 min-w-0">
-                                <div className="flex justify-between mb-1">
-                                    <span className="text-sm font-medium text-white truncate">{file.name}</span>
-                                    <span className="text-xs text-gray-400">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+                <Card variant="glass" className="mt-8 space-y-4 border-white/10">
+                    <div className="space-y-4">
+                        {files.map((file) => (
+                            <div key={file.name} className="flex items-center gap-4 bg-white/5 p-3 rounded-xl border border-white/5">
+                                <DocumentIcon className="w-8 h-8 text-indigo-400" />
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex justify-between mb-1">
+                                        <span className="text-sm font-medium text-white truncate">{file.name}</span>
+                                        <span className="text-xs text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+                                    </div>
+
+                                    {/* Progress Bar */}
+                                    <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                        <div
+                                            className={cn(
+                                                "h-full transition-all duration-300",
+                                                uploadStatus[file.name] === 'error' ? 'bg-red-500' :
+                                                    uploadStatus[file.name] === 'success' ? 'bg-green-500' : 'bg-primary'
+                                            )}
+                                            style={{ width: `${uploadProgress[file.name] || 0}%` }}
+                                        />
+                                    </div>
                                 </div>
 
-                                {/* Progress Bar */}
-                                <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                    <div
-                                        className={`h-full transition-all duration-300 ${uploadStatus[file.name] === 'error' ? 'bg-red-500' :
-                                                uploadStatus[file.name] === 'success' ? 'bg-green-500' : 'bg-primary'
-                                            }`}
-                                        style={{ width: `${uploadProgress[file.name] || 0}%` }}
-                                    />
+                                <div className="w-8 flex justify-center">
+                                    {uploadStatus[file.name] === 'success' && <CheckCircleIcon className="w-6 h-6 text-green-500" />}
+                                    {uploadStatus[file.name] === 'error' && <XMarkIcon className="w-6 h-6 text-red-500" />}
+                                    {uploadStatus[file.name] === 'pending' && (
+                                        <button onClick={() => removeFile(file.name)} className="text-muted-foreground hover:text-white">
+                                            <XMarkIcon className="w-5 h-5" />
+                                        </button>
+                                    )}
                                 </div>
                             </div>
-
-                            <div className="w-8 flex justify-center">
-                                {uploadStatus[file.name] === 'success' && <CheckCircleIcon className="w-6 h-6 text-green-500" />}
-                                {uploadStatus[file.name] === 'error' && <XMarkIcon className="w-6 h-6 text-red-500" />}
-                                {uploadStatus[file.name] === 'pending' && (
-                                    <button onClick={() => removeFile(file.name)} className="text-gray-500 hover:text-white">
-                                        <XMarkIcon className="w-5 h-5" />
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
 
                     <div className="flex justify-end pt-4 border-t border-white/10">
-                        <NeoButton onClick={startUploads} disabled={files.every(f => uploadStatus[f.name] !== 'pending')}>
+                        <Button
+                            onClick={startUploads}
+                            disabled={files.every(f => uploadStatus[f.name] !== 'pending')}
+                            variant="premium"
+                        >
                             Start Upload
-                        </NeoButton>
+                        </Button>
                     </div>
-                </GlassCard>
+                </Card>
             )}
         </div>
     );

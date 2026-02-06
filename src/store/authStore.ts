@@ -9,8 +9,10 @@ interface User {
 interface AuthState {
     user: User | null;
     isAuthenticated: boolean;
+    accessToken: string | null;
     allowedEmails: string[];
     setUser: (user: User | null) => void;
+    setAccessToken: (token: string | null) => void;
     logout: () => void;
 }
 
@@ -24,13 +26,15 @@ const AUTHORIZED_EMAILS = [
 export const useAuthStore = create<AuthState>((set) => ({
     user: null,
     isAuthenticated: false,
+    accessToken: null,
     allowedEmails: AUTHORIZED_EMAILS,
     setUser: (user) => {
         if (user && AUTHORIZED_EMAILS.includes(user.email.toLowerCase())) {
             set({ user, isAuthenticated: true });
         } else {
-            set({ user: null, isAuthenticated: false });
+            set({ user: null, isAuthenticated: false, accessToken: null });
         }
     },
-    logout: () => set({ user: null, isAuthenticated: false }),
+    setAccessToken: (token) => set({ accessToken: token }),
+    logout: () => set({ user: null, isAuthenticated: false, accessToken: null }),
 }));
