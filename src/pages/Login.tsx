@@ -3,6 +3,7 @@ import { useAuthStore } from '../store/authStore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { motion } from 'framer-motion';
+import bgGrid from '../assets/bg-grid.svg';
 import axios from 'axios';
 
 const Login: React.FC = () => {
@@ -43,7 +44,10 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 relative overflow-hidden bg-[url('/bg-grid.svg')] bg-fixed bg-cover">
+    <div
+      className="min-h-screen bg-background flex flex-col items-center justify-center p-4 relative overflow-hidden bg-fixed bg-cover"
+      style={{ backgroundImage: `url(${bgGrid})` }}
+    >
       {/* Animated Background Elements */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-3xl animate-pulse-slow"></div>
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '1s' }}></div>

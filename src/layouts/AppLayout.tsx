@@ -13,6 +13,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '../components/ui/Button';
 import { cn } from '../lib/utils';
+import bgGrid from '../assets/bg-grid.svg';
 
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { user, logout } = useAuthStore();
@@ -137,7 +138,10 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             </AnimatePresence>
 
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-col min-w-0 relative bg-[url('/bg-grid.svg')] bg-fixed bg-cover">
+            <div
+                className="flex-1 flex flex-col min-w-0 relative bg-fixed bg-cover"
+                style={{ backgroundImage: `url(${bgGrid})` }}
+            >
                 {/* Mobile Header */}
                 <header className="md:hidden h-16 border-b border-white/5 flex items-center justify-between px-4 bg-background/50 backdrop-blur-xl sticky top-0 z-30">
                     <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 -ml-2 text-white">
