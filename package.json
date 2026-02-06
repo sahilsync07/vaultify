@@ -16,14 +16,17 @@
     "@headlessui/react": "^2.1.2",
     "@heroicons/react": "^2.1.5",
     "axios": "^1.13.4",
+    "clsx": "^2.1.1",
     "dotenv": "^17.2.4",
     "firebase": "^10.14.1",
+    "framer-motion": "^12.33.0",
     "jwt-decode": "^4.0.0",
     "pdfjs-dist": "^4.7.76",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-pdf": "^9.1.0",
     "react-router-dom": "^6.27.0",
+    "tailwind-merge": "^3.4.0",
     "zustand": "^5.0.0"
   },
   "devDependencies": {

@@ -1,172 +1,209 @@
-import React, { useState, useEffect } from 'react';
-import { useAuthStore } from '../store/authStore';
-import { MagnifyingGlassIcon, ArrowLeftOnRectangleIcon, FolderIcon, DocumentIcon, EyeIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import React, { useEffect, useState } from 'react';
+import AppLayout from '../layouts/AppLayout';
+import GlassCard from '../components/ui/GlassCard';
+import NeoButton from '../components/ui/NeoButton';
+import UploadZone from '../components/features/UploadZone';
+import FilePreview from '../components/features/FilePreview';
+import {
+  MagnifyingGlassIcon,
+  DocumentIcon,
+  PhotoIcon,
+  CloudArrowUpIcon,
+  XMarkIcon
+} from '@heroicons/react/24/outline';
 
-interface VaultItem {
+interface DocumentItem {
   id: string;
   name: string;
-  category: string;
   mimeType: string;
+  category: string;
   webViewLink: string;
   thumbnailLink: string;
-  size: number;
   createdTime: string;
 }
 
 const Dashboard: React.FC = () => {
-  const { user, logout } = useAuthStore();
-  const [items, setItems] = useState<VaultItem[]>([]);
-  const [filteredItems, setFilteredItems] = useState<VaultItem[]>([]);
+  const [items, setItems] = useState<DocumentItem[]>([]);
+  const [filteredItems, setFilteredItems] = useState<DocumentItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [isLoading, setIsLoading] = useState(true);
+
+  // Feature States
+  const [showUpload, setShowUpload] = useState(false);
+  const [previewFile, setPreviewFile] = useState<DocumentItem | null>(null);
 
   useEffect(() => {
-    fetch('/documents.json')
-      .then(res => res.json())
-      .then(data => {
-        setItems(data.items || []);
-        setFilteredItems(data.items || []);
-        setIsLoading(false);
-      })
-      .catch(() => {
-        setIsLoading(false);
-      });
+    fetchDocuments();
   }, []);
 
+  const fetchDocuments = () => {
+    setIsLoading(true);
+    fetch('/vaultify/documents.json')
+      .then(res => res.json())
+      .then(data => {
+        const sortedItems = (data?.items || []).sort((a: DocumentItem, b: DocumentItem) =>
+          new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime()
+        );
+        setItems(sortedItems);
+        setFilteredItems(sortedItems);
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        console.error("Failed to load documents:", err);
+        setIsLoading(false);
+      });
+  };
+
   useEffect(() => {
-    const filtered = items.filter(item => {
-      const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
-      return matchesSearch && matchesCategory;
-    });
-    setFilteredItems(filtered);
+    let result = items;
+    if (selectedCategory !== 'All') {
+      result = result.filter(item => item.category === selectedCategory);
+    }
+    if (searchTerm) {
+      result = result.filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    }
+    setFilteredItems(result);
   }, [searchTerm, selectedCategory, items]);
 
-  const categories = ['All', ...new Set(items.map(i => i.category))];
+  const categories = ['All', 'Identity', 'Finance', 'Health', 'Education', 'Other'];
+
+  const getFileIcon = (mimeType: string) => {
+    if (mimeType.includes('image')) return <PhotoIcon className="w-8 h-8 text-pink-400" />;
+    if (mimeType.includes('pdf')) return <DocumentIcon className="w-8 h-8 text-red-400" />;
+    return <DocumentIcon className="w-8 h-8 text-blue-400" />;
+  };
 
   return (
-    <div className="flex h-screen bg-[#030303] overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-72 glass border-r border-white/10 flex flex-col">
-        <div className="p-8">
-          <div className="flex items-center gap-3 mb-10">
-            <div className="w-10 h-10 bg-gradient-to-tr from-violet-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-            </div>
-            <span className="text-2xl font-bold gradient-text">Vaultify</span>
-          </div>
+    <AppLayout>
+      <div className="flex flex-col h-full relative">
+        {/* Header / Search Area */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <h1 className="text-3xl font-bold text-white">My Vault</h1>
 
-          <nav className="space-y-2">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-4">Categories</p>
-            {categories.map(cat => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${selectedCategory === cat
-                    ? 'bg-violet-600/10 text-violet-400 border border-violet-600/20'
-                    : 'text-gray-400 hover:bg-white/5 hover:text-white'
-                  }`}
-              >
-                <FolderIcon className="w-5 h-5" />
-                <span className="font-medium text-sm">{cat}</span>
-              </button>
-            ))}
-          </nav>
+          <div className="flex items-center gap-3">
+            <div className="relative w-full md:w-80 group">
+              <input
+                type="text"
+                placeholder="Search..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all custom-input"
+              />
+              <MagnifyingGlassIcon className="w-5 h-5 text-gray-400 absolute left-3 top-3.5" />
+            </div>
+            <NeoButton onClick={() => setShowUpload(true)} variant="primary" className="hidden md:flex">
+              <CloudArrowUpIcon className="w-5 h-5" />
+              Upload
+            </NeoButton>
+          </div>
         </div>
 
-        <div className="mt-auto p-6 border-t border-white/10">
-          <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/5 mb-4">
-            <img src={user?.picture} className="w-10 h-10 rounded-full border border-white/20" alt="User" />
-            <div className="overflow-hidden">
-              <p className="text-sm font-medium text-white truncate">{user?.name}</p>
-              <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-            </div>
-          </div>
-          <button
-            onClick={logout}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-red-400 hover:bg-red-400/10 transition-all border border-transparent hover:border-red-400/20"
-          >
-            <ArrowLeftOnRectangleIcon className="w-5 h-5" />
-            <span className="text-sm font-semibold">Sign Out</span>
-          </button>
+        {/* Category Pills */}
+        <div className="flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide">
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`
+                        px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all
+                        ${selectedCategory === cat
+                  ? 'bg-primary text-white shadow-neon'
+                  : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
+                }
+                    `}
+            >
+              {cat}
+            </button>
+          ))}
         </div>
-      </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0">
-        <header className="h-20 flex items-center justify-between px-8 border-b border-white/10">
-          <div className="relative w-96">
-            <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-            <input
-              type="text"
-              placeholder="Search documents..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-4 py-2.5 text-sm transition focus:bg-white/10 focus:border-violet-600/50 outline-none"
-            />
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-xs text-gray-500 px-3 py-1 bg-white/5 rounded-full border border-white/10">
-              {filteredItems.length} items found
-            </span>
-          </div>
-        </header>
-
-        <div className="flex-1 overflow-y-auto p-8">
+        {/* Content Grid */}
+        <div className="flex-1">
           {isLoading ? (
-            <div className="flex flex-col items-center justify-center h-64 text-gray-500 italic">
-              <div className="animate-spin w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full mb-4"></div>
-              Loading your vault...
+            <div className="flex items-center justify-center h-64">
+              <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
             </div>
           ) : filteredItems.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredItems.map(item => (
-                <div key={item.id} className="glass-card flex flex-col group h-[340px]">
-                  <div className="relative aspect-[4/3] rounded-xl overflow-hidden bg-white/5 mb-4 border border-white/10">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20">
+              {filteredItems.map((item) => (
+                <GlassCard key={item.id} className="group relative overflow-hidden p-0 flex flex-col h-[280px]">
+                  {/* Thumbnail Preview */}
+                  <div
+                    className="h-40 bg-gray-900/50 relative overflow-hidden group-hover:opacity-80 transition-opacity cursor-pointer"
+                    onClick={() => setPreviewFile(item)}
+                  >
                     {item.thumbnailLink ? (
-                      <img src={item.thumbnailLink.replace('=s220', '=s800')} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt={item.name} />
+                      <img src={item.thumbnailLink} alt={item.name} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <DocumentIcon className="w-16 h-16 text-gray-700" />
+                        {getFileIcon(item.mimeType)}
                       </div>
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
-                      <div className="flex gap-2 w-full">
-                        <a
-                          href={item.webViewLink}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-lg text-xs font-semibold text-white transition border border-white/10"
-                        >
-                          <EyeIcon className="w-4 h-4" /> View
-                        </a>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <span className="px-4 py-2 bg-white/10 backdrop-blur-md rounded-full text-white text-sm font-medium border border-white/20">
+                        Preview
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Metadata */}
+                  <div className="p-4 flex-1 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <h3 className="font-semibold text-white truncate text-lg" title={item.name}>{item.name}</h3>
+                        <div className="p-1.5 bg-white/5 rounded-lg">
+                          {getFileIcon(item.mimeType)}
+                        </div>
                       </div>
+                      <span className="text-xs text-gray-500 uppercase tracking-wider">{item.category}</span>
                     </div>
                   </div>
-                  <div className="space-y-1 mt-auto">
-                    <p className="text-xs font-semibold text-violet-400 uppercase tracking-wider">{item.category}</p>
-                    <h3 className="font-semibold text-white truncate text-sm" title={item.name}>{item.name}</h3>
-                    <div className="flex items-center justify-between text-xs text-gray-500 pt-2">
-                      <span>{(item.size / 1024).toFixed(1)} KB</span>
-                      <span>{new Date(item.createdTime).toLocaleDateString()}</span>
-                    </div>
-                  </div>
-                </div>
+                </GlassCard>
               ))}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full text-gray-500">
-              <FolderIcon className="w-20 h-20 mb-4 opacity-10" />
-              <p className="text-xl font-medium">No documents found</p>
-              <p className="text-sm">Search another term or upload files to GDrive.</p>
+            <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+              <DocumentIcon className="w-16 h-16 mb-4 opacity-20" />
+              <p>No documents found.</p>
             </div>
           )}
         </div>
-      </main>
-    </div>
+
+        {/* Upload Modal */}
+        {showUpload && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="w-full max-w-3xl relative">
+              <button
+                onClick={() => setShowUpload(false)}
+                className="absolute -top-10 right-0 text-white/50 hover:text-white"
+              >
+                <XMarkIcon className="w-8 h-8" />
+              </button>
+              <UploadZone onUploadComplete={() => {
+                // Optional: Refresh list or show success message
+                // We rely on GitHub Sync for the public list, but client-side we can maybe mock it?
+                // For now, just close modal
+                setShowUpload(false);
+              }} />
+            </div>
+          </div>
+        )}
+
+        {/* Preview Modal */}
+        {previewFile && (
+          <FilePreview file={previewFile} onClose={() => setPreviewFile(null)} />
+        )}
+
+        {/* Mobile FAB for Upload */}
+        <button
+          onClick={() => setShowUpload(true)}
+          className="md:hidden fixed bottom-20 right-6 w-14 h-14 bg-primary rounded-full flex items-center justify-center shadow-neon z-40 active:scale-90 transition-transform"
+        >
+          <CloudArrowUpIcon className="w-7 h-7 text-white" />
+        </button>
+      </div>
+    </AppLayout>
   );
 };
 
