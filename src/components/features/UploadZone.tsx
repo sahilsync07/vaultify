@@ -3,6 +3,7 @@ import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { CloudArrowUpIcon, DocumentIcon, XMarkIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { cn } from '../../lib/utils';
+import { FEATURES } from '../../config';
 
 interface UploadZoneProps {
     onUploadComplete: () => void;
@@ -125,6 +126,11 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
     };
 
     const startUploads = () => {
+        if (!FEATURES.ENABLE_GOOGLE_AUTH) {
+            alert('File uploads are temporarily disabled.');
+            return;
+        }
+
         const client = window.google.accounts.oauth2.initTokenClient({
             client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
             scope: 'https://www.googleapis.com/auth/drive.file',

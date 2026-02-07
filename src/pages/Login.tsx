@@ -5,6 +5,7 @@ import { Button } from '../components/ui/Button';
 import { motion } from 'framer-motion';
 import bgGrid from '../assets/bg-grid.svg';
 import axios from 'axios';
+import { FEATURES } from '../config';
 
 const Login: React.FC = () => {
   const { setUser, setAccessToken } = useAuthStore();
@@ -12,6 +13,11 @@ const Login: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const handleGoogleLogin = () => {
+    if (!FEATURES.ENABLE_GOOGLE_AUTH) {
+      setError('Google Sign-In is temporarily disabled for maintenance.');
+      return;
+    }
+
     const client = window.google?.accounts.oauth2.initTokenClient({
       client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
       scope: 'https://www.googleapis.com/auth/drive.file email profile openid',
