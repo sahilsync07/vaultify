@@ -12,19 +12,22 @@ const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const handleGuestLogin = () => {
+    setIsLoading(true);
+    setTimeout(() => {
+      setUser({
+        email: 'sahilsync07@gmail.com', // Whitelisted for access
+        name: 'Guest User',
+        picture: 'https://ui-avatars.com/api/?name=Guest+User&background=random'
+      });
+      setAccessToken('guest-token');
+      setIsLoading(false);
+    }, 1000);
+  };
+
   const handleGoogleLogin = () => {
     if (!FEATURES.ENABLE_GOOGLE_AUTH) {
-      // Bypass Google Auth for testing/guest access
-      setIsLoading(true);
-      setTimeout(() => {
-        setUser({
-          email: 'sahilsync07@gmail.com', // Whitelisted for access
-          name: 'Guest User',
-          picture: 'https://ui-avatars.com/api/?name=Guest+User&background=random'
-        });
-        setAccessToken('guest-token');
-        setIsLoading(false);
-      }, 1000); // Simulate network delay
+      setError('Google Sign-In is temporarily disabled for maintenance.');
       return;
     }
 
@@ -100,7 +103,30 @@ const Login: React.FC = () => {
                   <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
                   <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                 </svg>
-                {FEATURES.ENABLE_GOOGLE_AUTH ? 'Sign in with Google' : 'Continue as Guest'}
+                Sign in with Google
+              </Button>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-white/10" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="px-2 text-muted-foreground bg-black/50 backdrop-blur-sm rounded-full">
+                    Or continue with
+                  </span>
+                </div>
+              </div>
+
+              <Button
+                onClick={handleGuestLogin}
+                className="w-full h-12 text-base bg-white/5 hover:bg-white/10 border border-white/10 text-white"
+                variant="secondary"
+                isLoading={isLoading}
+              >
+                <svg className="w-5 h-5 mr-3 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                Continue as Guest
               </Button>
               {error && (
                 <p className="text-sm text-destructive text-center bg-destructive/10 p-2 rounded-lg">{error}</p>

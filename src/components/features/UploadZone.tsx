@@ -4,12 +4,16 @@ import { Button } from '../ui/Button';
 import { CloudArrowUpIcon, DocumentIcon, XMarkIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { cn } from '../../lib/utils';
 import { FEATURES } from '../../config';
+import { useAuthStore } from '../../store/authStore';
 
 interface UploadZoneProps {
     onUploadComplete: () => void;
 }
 
 const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
+    const { accessToken, setAccessToken } = useAuthStore();
+    const tokenClient = React.useRef<any>(null);
+
     const [isDragging, setIsDragging] = useState(false);
     const [files, setFiles] = useState<File[]>([]);
     const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
@@ -60,7 +64,36 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
         });
     };
 
-    const uploadFileToDrive = async (file: File, accessToken: string) => {
+    // Initialize Token Client
+    React.useEffect(() => {
+        if (FEATURES.ENABLE_GOOGLE_AUTH) {
+            tokenClient.current = window.google?.accounts.oauth2.initTokenClient({
+                client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+                scope: 'https://www.googleapis.com/auth/drive.file',
+                callback: (tokenResponse: any) => {
+                    if (tokenResponse.access_token) {
+                        setAccessToken(tokenResponse.access_token);
+                        // Auto-retry uploads upon new token
+                        processUploads(tokenResponse.access_token);
+                    }
+                },
+            });
+        }
+    }, [files, setAccessToken]); // Dependencies might need tuning, but files is needed if we close over it? No, use functional state updater or ref for files if needed. 
+    // Actually, processUploads needs latest 'files'. 
+    // Better to pass 'files' to processUploads or rely on state. 
+    // Since 'files' changes, effect might re-run. recreating tokenClient is fine check overhead.
+    // Optimization: Use a ref for files or just let it re-init.
+
+    const processUploads = (token: string) => {
+        files.forEach(file => {
+            if (uploadStatus[file.name] === 'pending' || uploadStatus[file.name] === 'error') {
+                uploadFileToDrive(file, token);
+            }
+        });
+    };
+
+    const uploadFileToDrive = async (file: File, token: string) => {
         try {
             setUploadStatus(prev => ({ ...prev, [file.name]: 'uploading' }));
 
@@ -74,13 +107,26 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
             const initRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${accessToken}`,
+                    'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json',
                     'X-Upload-Content-Type': file.type || 'application/octet-stream',
                     'X-Upload-Content-Length': file.size.toString()
                 },
                 body: JSON.stringify(metadata)
             });
+
+            if (initRes.status === 401) {
+                // Token invalid/expired
+                setUploadStatus(prev => ({ ...prev, [file.name]: 'error' }));
+                console.warn("Token expired, requesting new one...");
+                // Invalidate current token
+                setAccessToken(null);
+                // Trigger refresh if we haven't already (debounce?)
+                // For simplicity, let the user click "Start Upload" again which will now trigger auth, 
+                // OR try to auto-trigger:
+                tokenClient.current?.requestAccessToken();
+                return;
+            }
 
             if (!initRes.ok) throw new Error('Failed to initiate upload');
 
@@ -104,10 +150,23 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
                     setUploadStatus(prev => ({ ...prev, [file.name]: 'success' }));
                     setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
                     // If all done, trigger callback
-                    const allDone = files.every(f =>
-                        (f.name === file.name || uploadStatus[f.name] === 'success')
-                    );
-                    if (allDone) onUploadComplete();
+                    // Need to check latest status
+                    // We can't easily check other files statuses here accurately due to closures, 
+                    // but we can check if *this* was the last one conceptually.
+                    // simpler: check if any are NOT success/error?
+                    // Let's rely on the parent/effect or just simpler logic:
+                    // We just update status. The user sees "Success".
+                    // onUploadComplete is optional/called when ALL finished. 
+                    // We can do a check:
+                    setUploadStatus(currentStatus => {
+                        const newStatus: Record<string, 'pending' | 'uploading' | 'success' | 'error'> = { ...currentStatus, [file.name]: 'success' };
+                        const allFinished = files.every(f =>
+                            newStatus[f.name] === 'success' // Strict check? or success/error?
+                        );
+                        if (allFinished) setTimeout(onUploadComplete, 1000);
+                        return newStatus;
+                    });
+
                 } else {
                     setUploadStatus(prev => ({ ...prev, [file.name]: 'error' }));
                 }
@@ -131,20 +190,19 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
             return;
         }
 
-        const client = window.google.accounts.oauth2.initTokenClient({
-            client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-            scope: 'https://www.googleapis.com/auth/drive.file',
-            callback: (tokenResponse: any) => {
-                if (tokenResponse.access_token) {
-                    files.forEach(file => {
-                        if (uploadStatus[file.name] === 'pending') {
-                            uploadFileToDrive(file, tokenResponse.access_token);
-                        }
-                    });
-                }
-            },
-        });
-        client.requestAccessToken();
+        // Guest check
+        if (accessToken === 'guest-token') {
+            alert("Guest users cannot upload files. Please sign in with Google.");
+            return;
+        }
+
+        if (accessToken) {
+            // Optimistically try with current token
+            processUploads(accessToken);
+        } else {
+            // No token, ask for one
+            tokenClient.current?.requestAccessToken();
+        }
     };
 
     return (
