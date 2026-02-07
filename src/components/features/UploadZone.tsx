@@ -5,6 +5,7 @@ import { CloudArrowUpIcon, DocumentIcon, XMarkIcon, CheckCircleIcon } from '@her
 import { cn } from '../../lib/utils';
 import { FEATURES } from '../../config';
 import { useAuthStore } from '../../store/authStore';
+import { DOCUMENT_CATEGORIES, DocumentType, getCategoryForType } from '../../constants/documentTypes';
 
 interface UploadZoneProps {
     onUploadComplete: () => void;
@@ -18,6 +19,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
     const [files, setFiles] = useState<File[]>([]);
     const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
     const [uploadStatus, setUploadStatus] = useState<Record<string, 'pending' | 'uploading' | 'success' | 'error'>>({});
+    const [fileTypes, setFileTypes] = useState<Record<string, string>>({});
 
     const handleDrag = useCallback((e: React.DragEvent) => {
         e.preventDefault();
@@ -62,6 +64,15 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
             delete next[fileName];
             return next;
         });
+        setFileTypes(prev => {
+            const next = { ...prev };
+            delete next[fileName];
+            return next;
+        });
+    };
+
+    const handleTypeChange = (fileName: string, type: string) => {
+        setFileTypes(prev => ({ ...prev, [fileName]: type }));
     };
 
     // Initialize Token Client
@@ -79,11 +90,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
                 },
             });
         }
-    }, [files, setAccessToken]); // Dependencies might need tuning, but files is needed if we close over it? No, use functional state updater or ref for files if needed. 
-    // Actually, processUploads needs latest 'files'. 
-    // Better to pass 'files' to processUploads or rely on state. 
-    // Since 'files' changes, effect might re-run. recreating tokenClient is fine check overhead.
-    // Optimization: Use a ref for files or just let it re-init.
+    }, [files, setAccessToken]);
 
     const processUploads = (token: string) => {
         files.forEach(file => {
@@ -97,11 +104,18 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
         try {
             setUploadStatus(prev => ({ ...prev, [file.name]: 'uploading' }));
 
+            const selectedType = fileTypes[file.name] || 'Other';
+            const category = getCategoryForType(selectedType);
+
             // 1. Initiate Resumable Upload
             const metadata = {
                 name: file.name,
                 mimeType: file.type,
-                parents: [import.meta.env.VITE_GDRIVE_FOLDER_ID]
+                parents: [import.meta.env.VITE_GDRIVE_FOLDER_ID],
+                properties: {
+                    vaultifyType: selectedType,
+                    vaultifyCategory: category
+                }
             };
 
             const initRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable', {
@@ -121,9 +135,6 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
                 console.warn("Token expired, requesting new one...");
                 // Invalidate current token
                 setAccessToken(null);
-                // Trigger refresh if we haven't already (debounce?)
-                // For simplicity, let the user click "Start Upload" again which will now trigger auth, 
-                // OR try to auto-trigger:
                 tokenClient.current?.requestAccessToken();
                 return;
             }
@@ -147,17 +158,6 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
 
             xhr.onload = () => {
                 if (xhr.status === 200 || xhr.status === 201) {
-                    setUploadStatus(prev => ({ ...prev, [file.name]: 'success' }));
-                    setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
-                    // If all done, trigger callback
-                    // Need to check latest status
-                    // We can't easily check other files statuses here accurately due to closures, 
-                    // but we can check if *this* was the last one conceptually.
-                    // simpler: check if any are NOT success/error?
-                    // Let's rely on the parent/effect or just simpler logic:
-                    // We just update status. The user sees "Success".
-                    // onUploadComplete is optional/called when ALL finished. 
-                    // We can do a check:
                     setUploadStatus(currentStatus => {
                         const newStatus: Record<string, 'pending' | 'uploading' | 'success' | 'error'> = { ...currentStatus, [file.name]: 'success' };
                         const allFinished = files.every(f =>
@@ -193,6 +193,13 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
         // Guest check
         if (accessToken === 'guest-token') {
             alert("Guest users cannot upload files. Please sign in with Google.");
+            return;
+        }
+
+        // Validate that all files have a type selected
+        const missingTypes = files.some(f => !fileTypes[f.name]);
+        if (missingTypes) {
+            alert("Please select a document type for all files before uploading.");
             return;
         }
 
@@ -240,36 +247,55 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
                 <Card variant="glass" className="mt-8 space-y-4 border-white/10">
                     <div className="space-y-4">
                         {files.map((file) => (
-                            <div key={file.name} className="flex items-center gap-4 bg-white/5 p-3 rounded-xl border border-white/5">
-                                <DocumentIcon className="w-8 h-8 text-indigo-400" />
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex justify-between mb-1">
-                                        <span className="text-sm font-medium text-white truncate">{file.name}</span>
-                                        <span className="text-xs text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+                            <div key={file.name} className="flex flex-col gap-3 bg-white/5 p-4 rounded-xl border border-white/5">
+                                <div className="flex items-center gap-4">
+                                    <DocumentIcon className="w-8 h-8 text-indigo-400" />
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex justify-between mb-1">
+                                            <span className="text-sm font-medium text-white truncate">{file.name}</span>
+                                            <span className="text-xs text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+                                        </div>
+
+                                        {/* Progress Bar */}
+                                        <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                            <div
+                                                className={cn(
+                                                    "h-full transition-all duration-300",
+                                                    uploadStatus[file.name] === 'error' ? 'bg-red-500' :
+                                                        uploadStatus[file.name] === 'success' ? 'bg-green-500' : 'bg-primary'
+                                                )}
+                                                style={{ width: `${uploadProgress[file.name] || 0}%` }}
+                                            />
+                                        </div>
                                     </div>
 
-                                    {/* Progress Bar */}
-                                    <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                        <div
-                                            className={cn(
-                                                "h-full transition-all duration-300",
-                                                uploadStatus[file.name] === 'error' ? 'bg-red-500' :
-                                                    uploadStatus[file.name] === 'success' ? 'bg-green-500' : 'bg-primary'
-                                            )}
-                                            style={{ width: `${uploadProgress[file.name] || 0}%` }}
-                                        />
+                                    <div className="w-8 flex justify-center">
+                                        {uploadStatus[file.name] === 'success' && <CheckCircleIcon className="w-6 h-6 text-green-500" />}
+                                        {uploadStatus[file.name] === 'error' && <XMarkIcon className="w-6 h-6 text-red-500" />}
+                                        {uploadStatus[file.name] === 'pending' && (
+                                            <button onClick={() => removeFile(file.name)} className="text-muted-foreground hover:text-white">
+                                                <XMarkIcon className="w-5 h-5" />
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
 
-                                <div className="w-8 flex justify-center">
-                                    {uploadStatus[file.name] === 'success' && <CheckCircleIcon className="w-6 h-6 text-green-500" />}
-                                    {uploadStatus[file.name] === 'error' && <XMarkIcon className="w-6 h-6 text-red-500" />}
-                                    {uploadStatus[file.name] === 'pending' && (
-                                        <button onClick={() => removeFile(file.name)} className="text-muted-foreground hover:text-white">
-                                            <XMarkIcon className="w-5 h-5" />
-                                        </button>
-                                    )}
-                                </div>
+                                {uploadStatus[file.name] === 'pending' && (
+                                    <select
+                                        className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-primary/50"
+                                        value={fileTypes[file.name] || ''}
+                                        onChange={(e) => handleTypeChange(file.name, e.target.value)}
+                                    >
+                                        <option value="" disabled>Select Document Type</option>
+                                        {Object.entries(DOCUMENT_CATEGORIES).map(([category, types]) => (
+                                            <optgroup key={category} label={category}>
+                                                {types.map(type => (
+                                                    <option key={type} value={type}>{type}</option>
+                                                ))}
+                                            </optgroup>
+                                        ))}
+                                    </select>
+                                )}
                             </div>
                         ))}
                     </div>

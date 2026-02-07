@@ -11,15 +11,23 @@ import {
 } from '@heroicons/react/24/outline';
 import { cn } from '../lib/utils';
 import { Input } from '../components/ui/Input';
+import { DOCUMENT_CATEGORIES } from '../constants/documentTypes';
+
+interface DocumentMetadata {
+    vaultifyType?: string;
+    vaultifyCategory?: string;
+}
 
 interface DocumentItem {
     id: string;
     name: string;
     mimeType: string;
     category: string;
+    type?: string;
     webViewLink: string;
     thumbnailLink: string;
     createdTime: string;
+    properties?: DocumentMetadata;
 }
 
 const MyFiles: React.FC = () => {
@@ -55,7 +63,8 @@ const MyFiles: React.FC = () => {
         // Real GDrive Fetch
         try {
             const query = `'${import.meta.env.VITE_GDRIVE_FOLDER_ID}' in parents and trashing = false`;
-            const response = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id, name, mimeType, webViewLink, thumbnailLink, createdTime)`, {
+            // Requesting 'properties' field to get metadata
+            const response = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id, name, mimeType, webViewLink, thumbnailLink, createdTime, properties)`, {
                 headers: {
                     Authorization: `Bearer ${accessToken}`
                 }
@@ -68,11 +77,17 @@ const MyFiles: React.FC = () => {
                 id: f.id,
                 name: f.name,
                 mimeType: f.mimeType,
-                category: 'Other', // Auto-categorization logic could be added here
+                // Use metadata category if available, else standard fallback
+                category: f.properties?.vaultifyCategory || 'Other',
+                type: f.properties?.vaultifyType,
                 webViewLink: f.webViewLink,
                 thumbnailLink: f.thumbnailLink,
-                createdTime: f.createdTime
+                createdTime: f.createdTime,
+                properties: f.properties
             }));
+
+            // Sort by recently created
+            driveFiles.sort((a: any, b: any) => new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime());
 
             setItems(driveFiles);
             setFilteredItems(driveFiles);
@@ -94,7 +109,8 @@ const MyFiles: React.FC = () => {
         setFilteredItems(result);
     }, [searchTerm, selectedCategory, items]);
 
-    const categories = ['All', 'Identity', 'Finance', 'Health', 'Education', 'Other'];
+    // Generate categories list dynamically
+    const categories = ['All', ...Object.keys(DOCUMENT_CATEGORIES)];
 
     const getFileIcon = (mimeType: string) => {
         if (mimeType.includes('image')) return <PhotoIcon className="w-8 h-8 text-pink-400" />;
