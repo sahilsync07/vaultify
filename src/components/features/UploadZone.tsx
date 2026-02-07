@@ -5,7 +5,8 @@ import { CloudArrowUpIcon, DocumentIcon, XMarkIcon, CheckCircleIcon } from '@her
 import { cn } from '../../lib/utils';
 import { FEATURES } from '../../config';
 import { useAuthStore } from '../../store/authStore';
-import { DOCUMENT_CATEGORIES, DocumentType, getCategoryForType } from '../../constants/documentTypes';
+import { DOCUMENT_CATEGORIES, getCategoryForType } from '../../constants/documentTypes';
+import { driveService } from '../../services/driveService';
 
 interface UploadZoneProps {
     onUploadComplete: () => void;
@@ -107,41 +108,19 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
             const selectedType = fileTypes[file.name] || 'Other';
             const category = getCategoryForType(selectedType);
 
-            // 1. Initiate Resumable Upload
+            // 1. Initiate Resumable Upload via Service
             const metadata = {
                 name: file.name,
                 mimeType: file.type,
-                parents: [import.meta.env.VITE_GDRIVE_FOLDER_ID],
                 properties: {
                     vaultifyType: selectedType,
                     vaultifyCategory: category
                 }
             };
 
-            const initRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                    'X-Upload-Content-Type': file.type || 'application/octet-stream',
-                    'X-Upload-Content-Length': file.size.toString()
-                },
-                body: JSON.stringify(metadata)
-            });
+            // This will throw if config is missing, caught below
+            const uploadUrl = await driveService.initConfiguredUpload(token, file, metadata);
 
-            if (initRes.status === 401) {
-                // Token invalid/expired
-                setUploadStatus(prev => ({ ...prev, [file.name]: 'error' }));
-                console.warn("Token expired, requesting new one...");
-                // Invalidate current token
-                setAccessToken(null);
-                tokenClient.current?.requestAccessToken();
-                return;
-            }
-
-            if (!initRes.ok) throw new Error('Failed to initiate upload');
-
-            const uploadUrl = initRes.headers.get('Location');
             if (!uploadUrl) throw new Error('No upload location returned');
 
             // 2. Upload Content
@@ -158,10 +137,24 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
 
             xhr.onload = () => {
                 if (xhr.status === 200 || xhr.status === 201) {
+                    // Success!
+                    setUploadStatus(prev => ({ ...prev, [file.name]: 'success' }));
+                    setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
+
+                    // AUDIT LOGGING
+                    const { user } = useAuthStore.getState();
+                    driveService.logActivity(token, {
+                        user: user?.name || 'Unknown User',
+                        action: 'UPLOAD',
+                        details: `Uploaded ${file.name} (${selectedType})`,
+                        fileName: file.name
+                    });
+
+                    // Check all finished logic
                     setUploadStatus(currentStatus => {
                         const newStatus: Record<string, 'pending' | 'uploading' | 'success' | 'error'> = { ...currentStatus, [file.name]: 'success' };
                         const allFinished = files.every(f =>
-                            newStatus[f.name] === 'success' // Strict check? or success/error?
+                            newStatus[f.name] === 'success'
                         );
                         if (allFinished) setTimeout(onUploadComplete, 1000);
                         return newStatus;
@@ -178,9 +171,19 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
 
             xhr.send(file);
 
-        } catch (error) {
+        } catch (error: any) {
             console.error("Upload error:", error);
-            setUploadStatus(prev => ({ ...prev, [file.name]: 'error' }));
+            if (error.message === 'Unauthorized') {
+                setUploadStatus(prev => ({ ...prev, [file.name]: 'error' }));
+                console.warn("Token expired, requesting new one...");
+                setAccessToken(null);
+                tokenClient.current?.requestAccessToken();
+            } else if (error.message.includes('Folder ID')) {
+                alert(error.message); // Show the config error to user
+                setUploadStatus(prev => ({ ...prev, [file.name]: 'error' }));
+            } else {
+                setUploadStatus(prev => ({ ...prev, [file.name]: 'error' }));
+            }
         }
     };
 

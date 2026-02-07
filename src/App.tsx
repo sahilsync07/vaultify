@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import MyFiles from './pages/MyFiles';
 import UploadPage from './pages/UploadPage';
+import ActivityLog from './pages/ActivityLog';
 import Profile from './pages/Profile';
 
 const App: React.FC = () => {
@@ -19,6 +20,7 @@ const App: React.FC = () => {
         <Route path="/dashboard" element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" replace />} />
         <Route path="/files" element={isAuthenticated ? <MyFiles /> : <Navigate to="/login" replace />} />
         <Route path="/upload" element={isAuthenticated ? <UploadPage /> : <Navigate to="/login" replace />} />
+        <Route path="/logs" element={isAuthenticated ? <ActivityLog /> : <Navigate to="/login" replace />} />
         <Route path="/profile" element={isAuthenticated ? <Profile /> : <Navigate to="/login" replace />} />
 
         {/* Default Redirect */}

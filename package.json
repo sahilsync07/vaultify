@@ -17,6 +17,7 @@
     "@heroicons/react": "^2.1.5",
     "axios": "^1.13.4",
     "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
     "dotenv": "^17.2.4",
     "firebase": "^10.14.1",
     "framer-motion": "^12.33.0",

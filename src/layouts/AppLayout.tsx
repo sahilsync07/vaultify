@@ -8,7 +8,8 @@ import {
     UserIcon,
     ArrowLeftOnRectangleIcon,
     Bars3Icon,
-    XMarkIcon
+    XMarkIcon,
+    ShieldCheckIcon
 } from '@heroicons/react/24/outline';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '../components/ui/Button';
@@ -27,8 +28,9 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
     const navItems = [
         { name: 'Dashboard', path: '/dashboard', icon: HomeIcon },
-        { name: 'My Files', path: '/files', icon: FolderIcon },
         { name: 'Upload', path: '/upload', icon: CloudArrowUpIcon },
+        { name: 'My Files', path: '/files', icon: FolderIcon },
+        { name: 'Logs', path: '/logs', icon: ShieldCheckIcon },
         { name: 'Profile', path: '/profile', icon: UserIcon },
     ];
 

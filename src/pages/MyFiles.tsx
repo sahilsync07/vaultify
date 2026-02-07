@@ -3,6 +3,7 @@ import AppLayout from '../layouts/AppLayout';
 import { Card } from '../components/ui/Card';
 import FilePreview from '../components/features/FilePreview';
 import { useAuthStore } from '../store/authStore';
+import { driveService } from '../services/driveService';
 import {
     MagnifyingGlassIcon,
     DocumentIcon,
@@ -62,18 +63,9 @@ const MyFiles: React.FC = () => {
 
         // Real GDrive Fetch
         try {
-            const query = `'${import.meta.env.VITE_GDRIVE_FOLDER_ID}' in parents and trashing = false`;
-            // Requesting 'properties' field to get metadata
-            const response = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id, name, mimeType, webViewLink, thumbnailLink, createdTime, properties)`, {
-                headers: {
-                    Authorization: `Bearer ${accessToken}`
-                }
-            });
+            const files = await driveService.listFiles(accessToken);
 
-            if (!response.ok) throw new Error('Failed to fetch files');
-
-            const data = await response.json();
-            const driveFiles = (data.files || []).map((f: any) => ({
+            const driveFiles = files.map((f: any) => ({
                 id: f.id,
                 name: f.name,
                 mimeType: f.mimeType,
@@ -89,8 +81,11 @@ const MyFiles: React.FC = () => {
             // Sort by recently created
             driveFiles.sort((a: any, b: any) => new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime());
 
-            setItems(driveFiles);
-            setFilteredItems(driveFiles);
+            // Exclude the log file itself from "My Files" view to avoid clutter
+            const cleanFiles = driveFiles.filter(f => f.name !== 'vaultify_audit_logs.json');
+
+            setItems(cleanFiles);
+            setFilteredItems(cleanFiles);
         } catch (error) {
             console.error("Error fetching Drive files:", error);
         } finally {
